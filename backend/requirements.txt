@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+supabase
+python-multipart
+pillow
+opencv-python-headless
+ultralytics
+pytesseract
+httpx
+python-jose[cryptography]
+numpy
