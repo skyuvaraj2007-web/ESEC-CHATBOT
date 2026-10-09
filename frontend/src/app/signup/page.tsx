@@ -130,7 +130,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#080B14] flex flex-col justify-center items-center px-4 py-10 relative overflow-hidden">
+    <div className="min-h-screen min-h-dvh pt-safe pb-safe bg-[#080B14] flex flex-col justify-center items-center px-4 py-8 relative overflow-hidden">
       {/* Ambient background glow */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] bg-[#8B5CF6]/15 blur-[140px] rounded-full pointer-events-none" />
       <div className="absolute bottom-10 right-1/4 w-80 h-80 bg-[#22D3EE]/10 blur-[130px] rounded-full pointer-events-none" />

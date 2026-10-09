@@ -23,7 +23,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#080B14] text-[#F8FAFC] flex flex-col selection:bg-[#8B5CF6]/30">
       {/* Navigation Bar */}
-      <header className="h-16 sm:h-20 border-b border-white/[0.08] px-4 sm:px-6 lg:px-12 flex items-center justify-between sticky top-0 bg-[#080B14]/80 backdrop-blur-xl z-50">
+      <header className="pt-safe border-b border-white/[0.08] px-4 sm:px-6 lg:px-12 flex items-center justify-between sticky top-0 bg-[#080B14]/80 backdrop-blur-xl z-50 min-h-[56px] sm:min-h-[64px]">
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-[#8B5CF6] to-[#22D3EE] p-0.5 shadow-xl shadow-[#8B5CF6]/25 shrink-0">
             <div className="w-full h-full bg-[#080B14] rounded-[10px] flex items-center justify-center">

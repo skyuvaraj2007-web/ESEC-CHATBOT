@@ -21,7 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   const { user, signOut } = useAuth();
 
   return (
-    <header className="h-16 border-b border-white/[0.08] bg-[#080B14]/90 backdrop-blur-xl px-3 sm:px-4 lg:px-6 flex items-center justify-between sticky top-0 z-40 shrink-0">
+    <header className="pt-safe border-b border-white/[0.08] bg-[#080B14]/90 backdrop-blur-xl px-3 sm:px-4 lg:px-6 flex items-center justify-between sticky top-0 z-40 shrink-0 min-h-[56px] sm:min-h-[64px]">
       <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         {onToggleSidebar && (
           <button

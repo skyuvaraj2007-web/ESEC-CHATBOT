@@ -25,7 +25,7 @@ export default function AppLayout({
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           showTelemetryToggle={false}
         />
-        <main className="flex-1 flex min-w-0 h-[calc(100dvh-4rem)] overflow-hidden">
+        <main className="flex-1 min-h-0 flex min-w-0 overflow-hidden">
           {children}
         </main>
       </div>
