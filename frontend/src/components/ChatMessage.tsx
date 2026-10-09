@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MessageModel, SelectedRegion, SelectedObjectContext } from '@/types';
 import { ObjectOverlay } from './ObjectOverlay';
+import { AudioResponsePlayer } from './AudioResponsePlayer';
+import { api } from '@/lib/api';
 import {
   User,
   Copy,
@@ -14,6 +16,8 @@ import {
   VolumeX,
   Mic,
   Languages,
+  Globe,
+  Loader2,
   Cpu,
   Layers,
   FileText,
@@ -29,6 +33,9 @@ interface ChatMessageProps {
   onSpeak?: (text: string, language?: string) => void;
   isSpeakingThis?: boolean;
   onStopSpeaking?: () => void;
+  activePlayingId?: string | null;
+  onPlayStart?: (id: string) => void;
+  onPlayEnd?: () => void;
   onSelectSuggestedQuestion?: (question: string) => void;
   selectedRegion?: SelectedRegion | null;
   selectedObject?: SelectedObjectContext | null;
@@ -37,6 +44,14 @@ interface ChatMessageProps {
   onActionClick?: (actionType: string, defaultQuery: string) => void;
 }
 
+const TRANSLATION_LANGUAGES = [
+  { code: 'ta', name: 'Tamil (தமிழ்)' },
+  { code: 'ml', name: 'Malayalam (മലയാളം)' },
+  { code: 'hi', name: 'Hindi (हिन्दी)' },
+  { code: 'en', name: 'English' },
+  { code: 'tanglish', name: 'Tanglish' },
+];
+
 export const ChatMessage: React.FC<ChatMessageProps> = ({
   message,
   onSelectImage,
@@ -44,6 +59,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   onSpeak,
   isSpeakingThis = false,
   onStopSpeaking,
+  activePlayingId,
+  onPlayStart,
+  onPlayEnd,
   onSelectSuggestedQuestion,
   selectedRegion,
   selectedObject,
@@ -53,6 +71,25 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [showTechDetails, setShowTechDetails] = useState(false);
+  const [translatedText, setTranslatedText] = useState<string | null>(null);
+  const [translatedLang, setTranslatedLang] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [isTranslateMenuOpen, setIsTranslateMenuOpen] = useState(false);
+  const [translationError, setTranslationError] = useState<string | null>(null);
+  const [showOriginal, setShowOriginal] = useState(false);
+
+  const translateMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (translateMenuRef.current && !translateMenuRef.current.contains(e.target as Node)) {
+        setIsTranslateMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const isUser = message.role === 'user';
   const isError =
     message.user_id === 'system' ||
@@ -60,19 +97,37 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
   const isVoiceMessage = message.input_mode === 'voice' || message.input_mode === 'voice_response';
 
+  const handleTranslate = async (targetLang: string) => {
+    setIsTranslating(true);
+    setTranslationError(null);
+    setIsTranslateMenuOpen(false);
+    try {
+      const res = await api.translateResponse({
+        text: message.content,
+        targetLanguage: targetLang,
+        conversationId: message.conversation_id,
+      });
+      setTranslatedText(res.translated_text);
+      setTranslatedLang(res.target_language);
+      setShowOriginal(false);
+    } catch (err: any) {
+      setTranslationError(err.message || 'Translation failed. Please retry.');
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(message.content);
+    const textToCopy = (translatedText && !showOriginal) ? translatedText : message.content;
+    navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleToggleSpeak = () => {
-    if (isSpeakingThis && onStopSpeaking) {
-      onStopSpeaking();
-    } else if (onSpeak) {
-      onSpeak(message.content, message.language || undefined);
-    }
-  };
+  const currentDisplayContent = (translatedText && !showOriginal) ? translatedText : message.content;
+  const currentDisplayLanguage = (translatedText && !showOriginal)
+    ? (translatedLang || 'auto')
+    : (message.response_language || message.language || 'auto');
 
   const tools = message.tools_used;
 
@@ -220,44 +275,112 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             </div>
           )}
 
-          <div className="whitespace-pre-wrap break-words">{message.content}</div>
+          {/* Translation Status Badge if Translated */}
+          {translatedText && (
+            <div className="mb-2 px-2 py-1 rounded-lg bg-[#8B5CF6]/15 border border-[#8B5CF6]/30 flex items-center justify-between text-[11px] text-[#D0BCFF]">
+              <div className="flex items-center gap-1.5">
+                <Languages className="w-3.5 h-3.5 text-[#22D3EE]" />
+                <span className="font-semibold text-white">
+                  {showOriginal ? 'Showing Original' : `Translated to ${translatedLang === 'ta' ? 'Tamil' : translatedLang === 'ml' ? 'Malayalam' : translatedLang === 'hi' ? 'Hindi' : translatedLang?.toUpperCase()}`}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOriginal(!showOriginal)}
+                className="text-[10px] underline text-[#22D3EE] hover:text-white transition"
+              >
+                {showOriginal ? 'View Translation' : 'View Original'}
+              </button>
+            </div>
+          )}
+
+          {/* Message Content */}
+          <div className="whitespace-pre-wrap break-words">{currentDisplayContent}</div>
 
           {/* Action Footer */}
           {!isUser && !isError && (
-            <div className="mt-2.5 pt-2 border-t border-white/5 flex flex-wrap items-center justify-between gap-1.5 text-[11px] text-[#64748B]">
-              <span className="font-mono text-[10px] text-[#64748B]">
-                {tools?.mode === 'gemini_auto_description'
-                  ? 'Automatic Visual Description'
-                  : 'Adaptive Multimodal Pipeline'}
-              </span>
+            <div className="mt-2.5 pt-2 border-t border-white/5 flex flex-col gap-2">
+              {/* Realistic Neural Voice Player Bar */}
+              <AudioResponsePlayer
+                text={currentDisplayContent}
+                messageId={message.id || `msg-${message.created_at || Date.now()}`}
+                defaultLanguage={currentDisplayLanguage}
+                activePlayingId={activePlayingId}
+                onPlayStart={onPlayStart}
+                onPlayEnd={onPlayEnd}
+              />
 
-              <div className="flex items-center gap-2 sm:gap-2.5 opacity-90 group-hover:opacity-100 transition shrink-0">
-                {/* Audio Speak / Stop Button */}
-                {onSpeak && (
+              <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] text-[#64748B] pt-0.5">
+                <span className="font-mono text-[10px] text-[#64748B]">
+                  {tools?.mode === 'gemini_auto_description'
+                    ? 'Automatic Visual Description'
+                    : 'Adaptive Multimodal Pipeline'}
+                </span>
+
+                <div className="flex items-center gap-2 sm:gap-2.5 opacity-90 group-hover:opacity-100 transition shrink-0">
+                  {/* Translate Response Dropdown */}
+                  <div className="relative" ref={translateMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsTranslateMenuOpen(!isTranslateMenuOpen)}
+                      disabled={isTranslating}
+                      className="hover:text-white flex items-center gap-1 transition min-h-[28px] px-2 py-0.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 text-[11px] text-[#94A3B8] disabled:opacity-50"
+                      title="Translate Response to another language"
+                    >
+                      {isTranslating ? (
+                        <>
+                          <Loader2 className="w-3 h-3 text-[#22D3EE] animate-spin" />
+                          <span>Translating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Languages className="w-3 h-3 text-[#8B5CF6]" />
+                          <span>Translate</span>
+                          <span className="text-[8px] text-[#64748B]">▼</span>
+                        </>
+                      )}
+                    </button>
+
+                    {isTranslateMenuOpen && (
+                      <div className="absolute bottom-full mb-1.5 right-0 w-44 rounded-xl bg-[#080B14] border border-white/15 p-1 shadow-2xl shadow-black z-50 animate-in fade-in zoom-in-95 space-y-0.5">
+                        <div className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-[#64748B]">
+                          Translate Response
+                        </div>
+                        {TRANSLATION_LANGUAGES.map((lang) => (
+                          <button
+                            key={lang.code}
+                            type="button"
+                            onClick={() => handleTranslate(lang.code)}
+                            className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-[11px] text-left text-[#94A3B8] hover:bg-white/[0.05] hover:text-white transition"
+                          >
+                            <span>{lang.name}</span>
+                            {translatedLang === lang.code && !showOriginal && (
+                              <Check className="w-3 h-3 text-[#22D3EE]" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Copy Text Button */}
                   <button
-                    onClick={handleToggleSpeak}
-                    className={`flex items-center gap-1 text-xs transition min-h-[30px] px-1.5 rounded hover:bg-white/[0.06] ${
-                      isSpeakingThis
-                        ? 'text-[#22D3EE] font-semibold animate-pulse'
-                        : 'text-[#94A3B8] hover:text-white'
-                    }`}
-                    title={isSpeakingThis ? 'Stop Audio Playback' : 'Listen to Response (TTS)'}
+                    onClick={handleCopy}
+                    className="hover:text-white flex items-center gap-1 transition min-h-[28px] px-2 py-0.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 text-[11px]"
+                    title="Copy text"
                   >
-                    {isSpeakingThis ? <VolumeX className="w-3.5 h-3.5 text-[#22D3EE]" /> : <Volume2 className="w-3.5 h-3.5" />}
-                    <span>{isSpeakingThis ? 'Stop' : 'Listen'}</span>
+                    {copied ? <Check className="w-3 h-3 text-[#34D399]" /> : <Copy className="w-3 h-3" />}
+                    <span>{copied ? 'Copied' : 'Copy'}</span>
                   </button>
-                )}
-
-                {/* Copy Text Button */}
-                <button
-                  onClick={handleCopy}
-                  className="hover:text-white flex items-center gap-1 transition min-h-[30px] px-1.5 rounded hover:bg-white/[0.06]"
-                  title="Copy text"
-                >
-                  {copied ? <Check className="w-3 h-3 text-[#34D399]" /> : <Copy className="w-3 h-3" />}
-                  <span>{copied ? 'Copied' : 'Copy'}</span>
-                </button>
+                </div>
               </div>
+
+              {/* Translation Error Banner */}
+              {translationError && (
+                <div className="text-[10px] text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-1 rounded-lg">
+                  {translationError}
+                </div>
+              )}
             </div>
           )}
 

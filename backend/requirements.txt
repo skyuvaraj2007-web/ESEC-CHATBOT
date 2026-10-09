@@ -11,3 +11,4 @@ pytesseract
 httpx
 python-jose[cryptography]
 numpy
+edge-tts>=7.0.0

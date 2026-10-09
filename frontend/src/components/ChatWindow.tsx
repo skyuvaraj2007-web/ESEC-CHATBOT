@@ -57,6 +57,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onActionClick,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [activeAudioMessageId, setActiveAudioMessageId] = React.useState<string | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -134,6 +135,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 onSpeak={(text, lang) => onSpeak && onSpeak(text, lang)}
                 isSpeakingThis={speakingMessageId === msg.id}
                 onStopSpeaking={onStopSpeaking}
+                activePlayingId={activeAudioMessageId}
+                onPlayStart={(id) => setActiveAudioMessageId(id)}
+                onPlayEnd={() => setActiveAudioMessageId(null)}
                 onSelectSuggestedQuestion={onSelectSuggestedQuestion}
                 selectedRegion={selectedRegion}
                 selectedObject={selectedObject}

@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
-from app.api import auth, conversations, images, chat, compare, insights
+from app.api import auth, conversations, images, chat, compare, insights, tts
 from app.services.gemini_service import GeminiService
 
 app = FastAPI(
@@ -26,7 +26,7 @@ parsed_origins = [
     for url in raw_frontend_url.split(",")
     if url.strip()
 ]
-for local_origin in ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"]:
+for local_origin in ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "https://localhost", "capacitor://localhost"]:
     if local_origin not in parsed_origins:
         parsed_origins.append(local_origin)
 
@@ -64,6 +64,7 @@ app.include_router(images.router)
 app.include_router(chat.router)
 app.include_router(compare.router)
 app.include_router(insights.router)
+app.include_router(tts.router)
 
 # Global Exception Handlers for standard response schema
 @app.exception_handler(StarletteHTTPException)

@@ -93,7 +93,8 @@ class LanguageService:
         
         # If user explicitly specified non-auto preference, respect that
         if user_preference and user_preference != "auto":
-            if user_preference in ("ta-Latn", "tanglish"):
+            pref = user_preference.lower().strip()
+            if pref in ("ta-latn", "tanglish"):
                 return {
                     "input_language": "tanglish",
                     "response_language": "tanglish",
@@ -102,45 +103,59 @@ class LanguageService:
                     "prompt_directive": (
                         "CRITICAL: The user explicitly requests responses in NATURAL TANGLISH (spoken Tamil written using Roman/English characters).\n"
                         "Respond in conversational Tanglish matching the user's natural cadence (e.g., 'Indha image la oru red circle irukku'). "
-                        "Do NOT translate into formal English or Tamil script."
+                        "Do NOT translate into formal English or Tamil Unicode script."
                     )
                 }
-            elif user_preference in ("ta", "ta-IN"):
+            elif pref in ("ta", "ta-in", "tamil"):
                 return {
                     "input_language": "ta",
                     "response_language": "ta",
                     "script": "tamil",
                     "style": "conversational",
-                    "prompt_directive": "CRITICAL: Respond in natural Tamil script (தமிழ்)."
+                    "prompt_directive": (
+                        "CRITICAL: The user explicitly requests the response in TAMIL (தமிழ்).\n"
+                        "பதிலை இயல்பான, தெளிவான தமிழில் வழங்கவும்.\n"
+                        "Explain the uploaded image and answer the user query entirely in natural Tamil script (தமிழ்).\n"
+                        "Preserve standard technical terms when appropriate and explain them in natural Tamil. Do NOT respond in English or Tanglish."
+                    )
                 }
-            elif user_preference in ("hi", "hi-IN"):
+            elif pref in ("hi", "hi-in", "hindi"):
                 return {
                     "input_language": "hi",
                     "response_language": "hi",
                     "script": "devanagari",
                     "style": "conversational",
-                    "prompt_directive": "CRITICAL: Respond in natural Hindi."
+                    "prompt_directive": (
+                        "CRITICAL: The user explicitly requests the response in HINDI (हिन्दी).\n"
+                        "उत्तर स्वाभाविक और स्पष्ट हिंदी में दें।\n"
+                        "Explain the uploaded image and answer the user query entirely in natural Hindi script (हिन्दी).\n"
+                        "Preserve standard technical terms when appropriate and explain them in natural Hindi. Do NOT respond in English."
+                    )
                 }
-            elif user_preference in ("ml", "ml-IN"):
+            elif pref in ("ml", "ml-in", "malayalam"):
                 return {
                     "input_language": "ml",
                     "response_language": "ml",
                     "script": "malayalam",
                     "style": "conversational",
-                    "prompt_directive": "CRITICAL: Respond in natural Malayalam."
+                    "prompt_directive": (
+                        "CRITICAL: The user explicitly requests the response in MALAYALAM (മലയാളം).\n"
+                        "സ്വാഭാവികവും വ്യക്തവുമായ മലയാളത്തിൽ മറുപടി നൽകുക.\n"
+                        "Explain the uploaded image and answer the user query entirely in natural Malayalam script (മലയാളം).\n"
+                        "Preserve standard technical terms when appropriate and explain them in natural Malayalam. Do NOT respond in English."
+                    )
                 }
-            elif user_preference in ("en", "en-IN", "en-US"):
+            elif pref in ("en", "en-in", "en-us", "english"):
                 return {
                     "input_language": "en",
                     "response_language": "en",
                     "script": "latin",
                     "style": "conversational",
-                    "prompt_directive": "CRITICAL: Respond in natural, fluent English."
+                    "prompt_directive": "CRITICAL: The user requested English. Respond entirely in natural, fluent English."
                 }
 
         # 2. Check Pure Indic Scripts
         if tamil_chars > 2 and tamil_chars >= latin_chars:
-            # Check if mixed Tamil script + English words
             is_mixed = latin_chars > 3
             return {
                 "input_language": "ta" if not is_mixed else "mixed",
@@ -148,9 +163,10 @@ class LanguageService:
                 "script": "tamil",
                 "style": "conversational",
                 "prompt_directive": (
-                    "CRITICAL: The user's latest message is written in TAMIL SCRIPT (தமிழ்).\n"
-                    "YOU MUST RESPOND IN TAMIL SCRIPT (தமிழ்), regardless of what language previous messages were in.\n"
-                    "If they used mixed English terms (like 'image', 'objects', 'color'), you may naturally retain technical terms."
+                    "CRITICAL: The user's query is in TAMIL SCRIPT (தமிழ்).\n"
+                    "பதிலை இயல்பான, தெளிவான தமிழில் வழங்கவும்.\n"
+                    "YOU MUST RESPOND ENTIRELY IN NATURAL TAMIL SCRIPT (தமிழ்), explaining the image in Tamil.\n"
+                    "Preserve standard technical terms when appropriate and explain them in natural Tamil."
                 )
             }
             
@@ -160,7 +176,12 @@ class LanguageService:
                 "response_language": "hi",
                 "script": "devanagari",
                 "style": "conversational",
-                "prompt_directive": "CRITICAL: The user is communicating in Hindi. YOU MUST respond in natural Hindi, regardless of prior conversation language."
+                "prompt_directive": (
+                    "CRITICAL: The user's query is in HINDI (हिन्दी).\n"
+                    "उत्तर स्वाभाविक और स्पष्ट हिंदी में दें।\n"
+                    "YOU MUST RESPOND ENTIRELY IN NATURAL HINDI SCRIPT (हिन्दी), explaining the image in Hindi.\n"
+                    "Preserve standard technical terms when appropriate and explain them in natural Hindi."
+                )
             }
             
         if malayalam_chars > 2:
@@ -169,7 +190,12 @@ class LanguageService:
                 "response_language": "ml",
                 "script": "malayalam",
                 "style": "conversational",
-                "prompt_directive": "CRITICAL: The user is communicating in Malayalam. YOU MUST respond in natural Malayalam, regardless of prior conversation language."
+                "prompt_directive": (
+                    "CRITICAL: The user's query is in MALAYALAM (മലയാളം).\n"
+                    "സ്വാഭാവികവും വ്യക്തവുമായ മലയാളത്തിൽ മറുപടി നൽകുക.\n"
+                    "YOU MUST RESPOND ENTIRELY IN NATURAL MALAYALAM SCRIPT (മലയാളം), explaining the image in Malayalam.\n"
+                    "Preserve standard technical terms when appropriate and explain them in natural Malayalam."
+                )
             }
             
         if telugu_chars > 2:

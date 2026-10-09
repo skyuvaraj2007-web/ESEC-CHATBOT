@@ -10,12 +10,12 @@ export interface LanguageOption {
 }
 
 export const SUPPORTED_LANGUAGES: LanguageOption[] = [
-  { code: 'auto', name: 'Auto Detect', nativeName: 'தானியங்கி', bcp47: 'en-IN' },
+  { code: 'auto', name: 'Auto Detect', nativeName: 'Auto Detect / தானியங்கி', bcp47: 'en-IN' },
+  { code: 'en', name: 'English', nativeName: 'English (India / Global)', bcp47: 'en-IN' },
   { code: 'ta', name: 'Tamil', nativeName: 'தமிழ்', bcp47: 'ta-IN' },
-  { code: 'ta-Latn', name: 'Tanglish', nativeName: 'Tanglish (Romanized Tamil)', bcp47: 'ta-IN' },
-  { code: 'en', name: 'English', nativeName: 'English (India)', bcp47: 'en-IN' },
-  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', bcp47: 'hi-IN' },
   { code: 'ml', name: 'Malayalam', nativeName: 'മലയാളം', bcp47: 'ml-IN' },
+  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', bcp47: 'hi-IN' },
+  { code: 'ta-Latn', name: 'Tanglish', nativeName: 'Tanglish (Romanized Tamil)', bcp47: 'ta-IN' },
   { code: 'te', name: 'Telugu', nativeName: 'తెలుగు', bcp47: 'te-IN' },
   { code: 'kn', name: 'Kannada', nativeName: 'ಕನ್ನಡ', bcp47: 'kn-IN' },
   { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', bcp47: 'bn-IN' },

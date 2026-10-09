@@ -21,6 +21,7 @@ import {
 import { CameraCapture } from './CameraCapture';
 import { useSpeech, SUPPORTED_LANGUAGES } from '@/lib/useSpeech';
 import { SelectedRegion, SelectedObjectContext } from '@/types';
+import { isNativePlatform, captureNativePhoto } from '@/lib/capacitor';
 
 interface ChatInputProps {
   onSendMessage: (
@@ -134,6 +135,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       // Immediately start automatic image understanding pipeline
       onSendMessage(currentText, file, url, 'text', selectedLanguage);
     }
+  };
+
+  const handleCameraTrigger = async () => {
+    if (isNativePlatform()) {
+      try {
+        const result = await captureNativePhoto();
+        if (result) {
+          handleCameraCapture(result.file, result.previewUrl);
+          return;
+        }
+      } catch (err) {
+        console.warn('Native camera capture error, falling back to viewfinder:', err);
+      }
+    }
+    setIsCameraOpen(true);
   };
 
   const handleCameraCapture = (blob: Blob, dataUrl: string) => {
@@ -410,7 +426,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             <button
               type="button"
-              onClick={() => setIsCameraOpen(true)}
+              onClick={handleCameraTrigger}
               title="Capture Frame with Camera"
               className="p-2 sm:p-2.5 rounded-xl text-[#94A3B8] hover:text-white hover:bg-white/[0.08] transition border border-transparent hover:border-white/10 min-w-[42px] min-h-[42px] flex items-center justify-center"
               aria-label="Open Camera"

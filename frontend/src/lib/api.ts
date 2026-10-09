@@ -78,15 +78,14 @@ async function request<T>(path: string, options: RequestInit = {}, retryCount = 
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   const url = `${BACKEND_URL}${cleanPath}`;
   const isPublicAuthEndpoint =
-    cleanPath.startsWith('/api/auth/demo-otp') ||
+    cleanPath.startsWith('/api/auth/') ||
+    cleanPath.startsWith('/api/tts') ||
+    cleanPath === '/api/chat/translate' ||
     cleanPath === '/health';
 
-  let token: string | null = null;
-  if (!isPublicAuthEndpoint) {
-    token = await getValidAccessToken();
-    if (!token) {
-      throw new Error('AUTH_REQUIRED');
-    }
+  const token = await getValidAccessToken();
+  if (!token && !isPublicAuthEndpoint) {
+    throw new Error('AUTH_REQUIRED');
   }
 
   const isFormData = options.body instanceof FormData;
@@ -396,4 +395,68 @@ export const api = {
       }),
     });
   },
+
+  // Text-to-Speech (Neural Voice Synthesis)
+  synthesizeSpeech: async (params: {
+    text: string;
+    language?: string;
+    gender?: 'female' | 'male';
+    rate?: string;
+  }): Promise<{ audioBlob: Blob; detectedLanguage: string; voiceId: string }> => {
+    const token = await getValidAccessToken();
+    const url = `${BACKEND_URL}/api/tts/synthesize`;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        text: params.text,
+        language: params.language || 'auto',
+        gender: params.gender || 'female',
+        rate: params.rate || '+0%',
+      }),
+    });
+
+    if (!response.ok) {
+      let errorMsg = `Voice synthesis failed (${response.status})`;
+      try {
+        const errJson = await response.json();
+        errorMsg = errJson.detail || errJson.error?.message || errorMsg;
+      } catch {}
+      throw new Error(errorMsg);
+    }
+
+    const detectedLanguage = response.headers.get('X-Detected-Language') || 'en';
+    const voiceId = response.headers.get('X-Voice-Id') || 'neural';
+    const audioBlob = await response.blob();
+
+    return { audioBlob, detectedLanguage, voiceId };
+  },
+
+  // Multilingual Response Translation
+  translateResponse: async (params: {
+    text: string;
+    targetLanguage: string;
+    sourceLanguage?: string;
+    conversationId?: string;
+  }): Promise<{ translated_text: string; target_language: string; voice_id: string; original_text: string }> => {
+    return request<{ translated_text: string; target_language: string; voice_id: string; original_text: string }>(
+      '/api/chat/translate',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          text: params.text,
+          target_language: params.targetLanguage,
+          source_language: params.sourceLanguage || 'auto',
+          conversation_id: params.conversationId,
+        }),
+      }
+    );
+  },
 };
+

@@ -327,13 +327,14 @@ class GeminiService:
             "   - 'Adhu pakkathula enna irukku?' asks for neighboring objects in the image relative to the referenced object.\n"
             "   - 'avan' / 'aval' refers to a previously identified person if visible.\n\n"
             "CRITICAL LANGUAGE MIRRORING & CONVERSATIONAL RULES:\n"
-            "1. Always respond in the EXACT same language, writing script, and conversational style as the user's latest message unless the user explicitly requests another language.\n"
-            "2. TANGLISH (Romanized Tamil): If the user writes in Tanglish, YOU MUST RESPOND IN NATURAL SPOKEN TANGLISH (e.g., 'Idhu blue color car.', 'Adhu left side la irukku.').\n"
-            "   - DO NOT convert Tanglish into formal English. DO NOT convert Tanglish into Tamil Unicode. Respond naturally in Romanized Tamil + casual English words.\n"
-            "3. SHORT FOLLOW-UP LANGUAGE INHERITANCE: If the ongoing conversation was in Tanglish and the user asks a short question (e.g., 'Color?', 'Size?', 'Why?'), MAINTAIN Tanglish.\n"
-            "4. TAMIL UNICODE: If the user asks in Tamil script, reply in natural Tamil script.\n"
-            "5. ENGLISH: If the user asks in English, reply in fluent English.\n"
-            "6. VISUAL TRUTHFULNESS: Base all answers directly on the visual contents of the uploaded image. Never hallucinate details."
+            "1. STRICT RESPONSE LANGUAGE ENFORCEMENT:\n"
+            "   - When requested or user queries in TAMIL (தமிழ்): பதிலை இயல்பான, தெளிவான தமிழில் வழங்கவும். YOU MUST RESPOND ENTIRELY IN NATURAL TAMIL SCRIPT (தமிழ்). Explain the uploaded image in Tamil, preserving technical terms where necessary.\n"
+            "   - When requested or user queries in MALAYALAM (മലയാളം): സ്വാഭാവികവും വ്യക്തവുമായ മലയാളത്തിൽ മറുപടി നൽകുക. YOU MUST RESPOND ENTIRELY IN NATURAL MALAYALAM SCRIPT (മലയാളം). Explain the uploaded image in Malayalam, preserving technical terms where necessary.\n"
+            "   - When requested or user queries in HINDI (हिन्दी): उत्तर स्वाभाविक और स्पष्ट हिंदी में दें। YOU MUST RESPOND ENTIRELY IN NATURAL HINDI SCRIPT (हिन्दी). Explain the uploaded image in Hindi, preserving technical terms where necessary.\n"
+            "   - When requested or user queries in ENGLISH: Respond entirely in natural, fluent English.\n"
+            "   - When requested or user queries in TANGLISH (Romanized Tamil): Respond in natural spoken Tanglish (e.g., 'Idhu blue color car. Left side la irukku.'). DO NOT convert Tanglish to formal English or Tamil script.\n"
+            "2. SHORT FOLLOW-UP LANGUAGE INHERITANCE: If the ongoing conversation was in Tamil, Malayalam, Hindi, or Tanglish, MAINTAIN that exact language for short follow-up questions.\n"
+            "3. VISUAL TRUTHFULNESS: Base all answers directly on the visual contents of the uploaded image. Never hallucinate details."
         )
 
         return {
@@ -570,25 +571,40 @@ Respond ONLY with a valid JSON object in this format:
 
     @staticmethod
     def get_suggested_questions(language_hint: Optional[str] = None) -> List[str]:
-        if language_hint in ("ta-Latn", "Tanglish"):
+        lang = (language_hint or "en").lower().strip()
+        if lang in ("ta-latn", "tanglish"):
             return [
                 "Indha image la enna main objects irukku?",
                 "Idhula edhavadhu text irukka?",
                 "Adhu enna color?",
                 "Tamil la explain pannu"
             ]
-        elif language_hint in ("ta", "Tamil"):
+        elif lang in ("ta", "tamil", "ta-in"):
             return [
                 "இந்த படத்தில் என்ன முக்கிய பொருட்கள் உள்ளன?",
                 "இதில் ஏதேனும் எழுத்துக்கள் உள்ளதா?",
                 "விவரமாக விளக்கு",
-                "ஆங்கிலத்தில் கூறு"
+                "வண்ணங்களை விவரி"
+            ]
+        elif lang in ("ml", "malayalam", "ml-in"):
+            return [
+                "ഈ ചിത്രത്തിൽ എന്തൊക്കെ പ്രധാന വസ്തുക്കളുണ്ട്?",
+                "ഇതിൽ എന്തെങ്കിലും എഴുത്തുണ്ടോ?",
+                "വിശദമായി പറയുക",
+                "നിറങ്ങൾ വിവരിക്കുക"
+            ]
+        elif lang in ("hi", "hindi", "hi-in"):
+            return [
+                "इस छवि में कौन सी मुख्य वस्तुएं हैं?",
+                "क्या इसमें कोई लिखावट दिखाई दे रही है?",
+                "विस्तार से समझाएं",
+                "रंगों का विवरण दें"
             ]
         return [
             "What are the main objects in this image?",
             "What text is visible or readable?",
             "Describe the spatial layout and colors",
-            "Explain in Tamil / Tanglish"
+            "Explain in detail"
         ]
 
     @classmethod
@@ -600,27 +616,75 @@ Respond ONLY with a valid JSON object in this format:
         opt_img = cls.optimize_image_for_vlm(image_bytes, max_dim=1024)
         b64_img = base64.b64encode(opt_img).decode("utf-8")
 
-        lang_instruction = "Respond in clear, professional English."
-        if language_hint:
-            if language_hint in ("ta", "Tamil"):
-                lang_instruction = "Respond naturally in Tamil Unicode script."
-            elif language_hint in ("ta-Latn", "Tanglish"):
-                lang_instruction = "Respond naturally in conversational Tanglish (Romanized Tamil script with English words)."
+        lang = (language_hint or "en").lower().strip()
+        if lang in ("ta", "tamil", "ta-in"):
+            lang_instruction = (
+                "பதிலை இயல்பான, தெளிவான தமிழில் வழங்கவும்.\n"
+                "Respond entirely in natural Tamil script (தமிழ்).\n\n"
+                "Structure your response clearly as follows:\n"
+                "### படத்தின் கண்ணோட்டம்\n"
+                "[படத்தின் முழுமையான சூழல், காட்சியமைப்பை விவரிக்கும் 2-3 வாக்கியங்கள்]\n\n"
+                "### முக்கிய காட்சி விவரங்கள்\n"
+                "• முதன்மை பொருள்கள் மற்றும் செயல்கள்: [காணப்படும் நபர்கள், பொருள்கள், செயல்பாடுகள்]\n"
+                "• வண்ணங்கள் மற்றும் அமைவு: [முக்கிய பொருள்கள், அவற்றின் வண்ணங்கள், இடம்]\n"
+                "• காணப்படும் எழுத்துக்கள்: [படத்தில் உள்ள எழுத்துக்கள் அல்லது 'தெளிவான எழுத்துக்கள் ஏதுமில்லை']\n"
+                "• சூழல் மற்றும் பின்னணி: [சூழல் வகை, ஒளி நிலை அல்லது குறிப்புகள்]"
+            )
+        elif lang in ("ml", "malayalam", "ml-in"):
+            lang_instruction = (
+                "സ്വാഭാവികവും വ്യക്തവുമായ മലയാളത്തിൽ മറുപടി നൽകുക.\n"
+                "Respond entirely in natural Malayalam script (മലയാളം).\n\n"
+                "Structure your response clearly as follows:\n"
+                "### ചിത്രത്തിന്റെ അവലോകനം\n"
+                "[ചിത്രത്തിന്റെ പൂർണ്ണമായ സാഹചര്യം വിവരിക്കുന്ന 2-3 വാക്യങ്ങൾ]\n\n"
+                "### പ്രധാന ദൃശ്യ വിവരങ്ങൾ\n"
+                "• പ്രധാന വിഷയങ്ങളും പ്രവർത്തനങ്ങളും: [കാണപ്പെടുന്ന വ്യക്തികൾ, വസ്തുക്കൾ, പ്രവർത്തനങ്ങൾ]\n"
+                "• വസ്തുക്കളും നിറങ്ങളും: [പ്രധാന വസ്തുക്കൾ, അവയുടെ നിറങ്ങൾ, സ്ഥാനം]\n"
+                "• കാണാവുന്ന അക്ഷരങ്ങൾ: [ചിത്രത്തിലുള്ള അക്ഷരങ്ങൾ അല്ലെങ്കിൽ 'വ്യക്തമായ അക്ഷരങ്ങളൊന്നുമില്ല']\n"
+                "• അന്തരീക്ഷവും സാഹചര്യങ്ങളും: [പരിസ്ഥിതി തരം, വെളിച്ചം അല്ലെങ്കിൽ നിരീക്ഷണങ്ങൾ]"
+            )
+        elif lang in ("hi", "hindi", "hi-in"):
+            lang_instruction = (
+                "उत्तर स्वाभाविक और स्पष्ट हिंदी में दें।\n"
+                "Respond entirely in natural Hindi script (हिन्दी).\n\n"
+                "Structure your response clearly as follows:\n"
+                "### छवि का अवलोकन\n"
+                "[छवि के समग्र दृश्य और संदर्भ का 2-3 वाक्यों में संक्षिप्त विवरण]\n\n"
+                "### मुख्य दृश्य विवरण\n"
+                "• मुख्य विषय और क्रियाएं: [दिखाई देने वाले व्यक्ति, विषय या क्रियाएं]\n"
+                "• वस्तुएं और रंग: [प्रमुख वस्तुएं, उनके रंग और स्थानिक स्थिति]\n"
+                "• दिखाई देने वाले शब्द/पाठ: [छवि में दिखाई देने वाला पाठ या 'कोई स्पष्ट पाठ दिखाई नहीं दे रहा']\n"
+                "• पर्यावरण और स्थितियां: [पर्यावरण का प्रकार, प्रकाश की स्थिति]"
+            )
+        elif lang in ("ta-latn", "tanglish"):
+            lang_instruction = (
+                "Respond naturally in conversational Tanglish (Romanized Tamil script with English words).\n\n"
+                "Structure your response clearly as follows:\n"
+                "### Image Overview\n"
+                "[2-3 sentence overview in natural Tanglish, e.g., 'Indha image la oru office environment theriyudhu.']\n\n"
+                "### Key Visual Details\n"
+                "• Main Subjects & Actions: [People or subjects visible]\n"
+                "• Objects & Colors: [Objects, colors, spatial positions]\n"
+                "• Visible Text: [Readable text or signs]\n"
+                "• Environment: [Lighting and atmosphere]"
+            )
+        else:
+            lang_instruction = (
+                "Respond in clear, professional English.\n\n"
+                "Structure your response clearly as follows:\n"
+                "### Image Overview\n"
+                "[A concise, comprehensive 2-3 sentence overview describing the overall scene, environment, and context]\n\n"
+                "### Key Visual Details\n"
+                "• Main Subjects & Actions: [Main people, subjects, animals, or actions visibly occurring]\n"
+                "• Objects & Colors: [Notable objects, their apparent colors, and spatial layout]\n"
+                "• Visible Text & Signs: [Any readable signs, labels, or text visibly present, or state 'No prominent text readable']\n"
+                "• Environment & Conditions: [Environment type, lighting conditions, or notable observations]"
+            )
 
         prompt = f"""You are VISIONAI's primary visual understanding engine.
 Analyze the uploaded image carefully and provide an automatic visual description.
 
 {lang_instruction}
-
-Structure your response clearly as follows:
-### Image Overview
-[A concise, comprehensive 2-3 sentence overview describing the overall scene, environment, and context]
-
-### Key Visual Details
-• Main Subjects & Actions: [Main people, subjects, animals, or actions visibly occurring]
-• Objects & Colors: [Notable objects, their apparent colors, and spatial layout]
-• Visible Text & Signs: [Any readable signs, labels, or text visibly present, or state 'No prominent text readable']
-• Environment & Conditions: [Environment type, lighting conditions, or notable observations]
 
 RULES:
 1. Clearly indicate uncertainty when something cannot be definitively determined (use phrases such as 'appears to be', 'seems to be', 'visible', 'not clearly visible').
@@ -647,6 +711,85 @@ RULES:
                 "maxOutputTokens": 1024
             }
         }
+
+    @classmethod
+    async def translate_text(
+        cls,
+        text: str,
+        target_language: str,
+        source_language: Optional[str] = "auto"
+    ) -> str:
+        """
+        Translates text accurately using Gemini into natural Tamil, Malayalam, Hindi, English, or Tanglish.
+        """
+        if not text or not text.strip():
+            return ""
+
+        if not cls.has_api_key():
+            return text
+
+        target_clean = (target_language or "en").lower().strip()
+        if target_clean in ("ta", "tamil", "ta-in"):
+            instruction = (
+                "Translate the following AI response text into natural, fluent Tamil script (தமிழ்).\n"
+                "பதிலை இயல்பான, தெளிவான தமிழில் வழங்கவும்.\n"
+                "Preserve standard technical terms where necessary and explain them in natural Tamil.\n"
+                "Do NOT generate English or Tanglish."
+            )
+        elif target_clean in ("ml", "malayalam", "ml-in"):
+            instruction = (
+                "Translate the following AI response text into natural, fluent Malayalam script (മലയാളം).\n"
+                "സ്വാഭാവികവും വ്യക്തവുമായ മലയാളത്തിൽ മറുപടി നൽകുക.\n"
+                "Preserve standard technical terms where necessary and explain them in natural Malayalam.\n"
+                "Do NOT generate English."
+            )
+        elif target_clean in ("hi", "hindi", "hi-in"):
+            instruction = (
+                "Translate the following AI response text into natural, fluent Hindi script (हिन्दी).\n"
+                "उत्तर स्वाभाविक और स्पष्ट हिंदी में दें।\n"
+                "Preserve standard technical terms where necessary and explain them in natural Hindi.\n"
+                "Do NOT generate English."
+            )
+        elif target_clean in ("tanglish", "ta-latn"):
+            instruction = (
+                "Translate the following text into natural, conversational Tanglish (spoken Tamil written in Roman/English characters, e.g., 'Indha image la oru laptop irukku').\n"
+                "Do NOT convert into formal Tamil Unicode script."
+            )
+        else:
+            instruction = "Translate the following text into natural, clear, fluent English."
+
+        prompt = f"{instruction}\n\n[ORIGINAL TEXT]\n{text}\n\nRespond ONLY with the direct translated text. Do not add any introductory or concluding meta remarks."
+
+        payload = {
+            "contents": [
+                {
+                    "parts": [{"text": prompt}]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 2048
+            }
+        }
+
+        models_to_try = [settings.GEMINI_MODEL] + [m for m in cls.FALLBACK_MODELS if m != settings.GEMINI_MODEL]
+        client = cls._get_client()
+
+        for model in models_to_try:
+            try:
+                res = await client.post(cls._get_api_url(model), json=payload)
+                if res.status_code == 200:
+                    candidates = res.json().get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        trans_res = "".join(p.get("text", "") for p in parts).strip()
+                        if trans_res:
+                            return trans_res
+            except Exception as e:
+                print(f"[GeminiService] Translation error with {model}: {e}")
+                continue
+
+        return text
 
     @classmethod
     async def generate_auto_image_description(

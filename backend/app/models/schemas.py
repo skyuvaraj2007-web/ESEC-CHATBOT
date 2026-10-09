@@ -149,3 +149,16 @@ class UserProfile(BaseModel):
 class UserProfileUpdate(BaseModel):
     full_name: Optional[str] = None
     avatar_url: Optional[str] = None
+
+class TranslateRequest(BaseModel):
+    text: str
+    target_language: str # 'ta' | 'ml' | 'hi' | 'en' | 'tanglish'
+    source_language: Optional[str] = "auto"
+    conversation_id: Optional[str] = None
+    message_id: Optional[str] = None
+
+class TranslateResponseData(BaseModel):
+    translated_text: str
+    target_language: str
+    voice_id: str
+    original_text: str

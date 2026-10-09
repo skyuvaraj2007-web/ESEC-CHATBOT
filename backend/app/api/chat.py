@@ -1,14 +1,23 @@
 import time
 import json
+from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from app.models.schemas import ApiResponse, ChatRequest, ChatResponseData, MessageModel
-from app.utils.security import get_current_user
+from app.models.schemas import (
+    ApiResponse,
+    ChatRequest,
+    ChatResponseData,
+    MessageModel,
+    TranslateRequest,
+    TranslateResponseData
+)
+from app.utils.security import get_current_user, get_current_user_optional
 from app.services.conversation_service import ConversationService
 from app.services.storage_service import StorageService
 from app.services.vision_service import VisionService
 from app.services.gemini_service import GeminiService
 from app.services.language_service import LanguageService
+from app.services.tts_service import TTSService
 from app.services.task_router import TaskRouter
 from app.utils.image_utils import base64_to_bytes, validate_image_bytes
 
@@ -439,3 +448,34 @@ async def stream_chat_message(
             "X-Accel-Buffering": "no"
         }
     )
+
+@router.post("/translate", response_model=ApiResponse[TranslateResponseData])
+async def translate_message_response(
+    body: TranslateRequest,
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """
+    Translates an assistant response on-demand to Tamil, Malayalam, Hindi, English, or Tanglish
+    using Gemini multimodal/linguistic reasoning.
+    """
+    if not body.text or not body.text.strip():
+        raise HTTPException(status_code=400, detail="Text to translate cannot be empty.")
+
+    target_lang = body.target_language.lower().strip()
+    translated_text = await GeminiService.translate_text(
+        text=body.text,
+        target_language=target_lang,
+        source_language=body.source_language
+    )
+
+    canonical_lang, voice_id = TTSService.resolve_voice(target_lang, gender="female")
+
+    return ApiResponse(
+        data=TranslateResponseData(
+            translated_text=translated_text,
+            target_language=canonical_lang,
+            voice_id=voice_id,
+            original_text=body.text
+        )
+    )
+

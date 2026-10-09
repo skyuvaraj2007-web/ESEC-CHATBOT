@@ -55,3 +55,15 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
+async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Security(security_bearer)) -> Optional[dict]:
+    """
+    Returns user dict if valid token is provided, or None for guest/unauthenticated requests.
+    """
+    if not credentials:
+        return None
+    try:
+        return await get_current_user(credentials)
+    except Exception:
+        return None
+
+

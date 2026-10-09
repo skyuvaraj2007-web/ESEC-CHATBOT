@@ -30,7 +30,7 @@ class TaskRouter:
     YOLO_PATTERNS = [
         r"\b(bounding\s*box(es)?|bbox(es)?|coordinates?|localize|localization)\b",
         r"\b(put\s+(a\s+)?box\s+(around|on)|draw\s+boxes?)\b",
-        r"\b(count\s+(all\s+)?(people|persons|cars|vehicles|objects|items|chairs|animals|things|bicycles|dogs|cats))\b",
+        r"\b(count\s+(all\s+)?(the\s+)?(people|persons|cars|vehicles|objects|items|chairs|animals|things|bicycles|dogs|cats))\b",
         r"\b(how\s+many\s+(people|persons|cars|vehicles|objects|items|chairs|animals|things|bicycles|dogs|cats)\s+(are\s+)?(detected|present|there))\b",
         r"\b(track\s+(this|the|all)?\s*(person|object|vehicle|car|item)?|tracking|region\s+detection|spatial\s+grid|spatial\s+localization)\b",
         r"\b(show\s+detected\s+objects\s+with\s+coordinates)\b",
@@ -38,10 +38,11 @@ class TaskRouter:
 
     # Exact text extraction / Dense document OCR keywords for on-demand OCR
     OCR_PATTERNS = [
-        r"\b(extract\s+(all|every|verbatim|exact)\s+text(\s+exactly)?)\b",
+        r"\b(extract\s+(all\s+)?(the\s+)?(every|verbatim|exact)\s+text(\s+exactly)?)\b",
         r"\b(extract\s+every\s+line(\s+of\s+text)?(\s+exactly)?)\b",
         r"\b(raw\s+ocr|pytesseract|exact\s+character\s+(extraction|preservation))\b",
         r"\b(scanned\s+(document|form|invoice|receipt)\s+text)\b",
+        r"\b(read\s+(all\s+)?(the\s+)?text\s+on\s+(the\s+)?(receipt|invoice|bill|document|sign))\b",
         r"\b(text\s+in\s+table\s+format|structured\s+text\s+table|extract\s+all\s+fields(\s+from\s+this\s+scanned\s+form)?)\b",
         r"\b(extract\s+all\s+text\s+from\s+(this|the)?\s*document)\b",
     ]
