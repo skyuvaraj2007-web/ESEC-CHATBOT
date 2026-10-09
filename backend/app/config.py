@@ -21,9 +21,9 @@ class Settings(BaseModel):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
     
-    # Server config
+    # Server config (Checks Render's dynamic PORT first)
     HOST: str = os.getenv("BACKEND_HOST", "0.0.0.0")
-    PORT: int = int(os.getenv("BACKEND_PORT", "8000"))
+    PORT: int = int(os.getenv("PORT", os.getenv("BACKEND_PORT", "8000")))
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     
     # Supabase Configuration

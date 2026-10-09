@@ -20,20 +20,37 @@ app = FastAPI(
 )
 
 # Configure CORS
-origins = [
-    settings.FRONTEND_URL,
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:3001"
+raw_frontend_url = os.getenv("FRONTEND_URL", settings.FRONTEND_URL)
+parsed_origins = [
+    url.strip().rstrip("/")
+    for url in raw_frontend_url.split(",")
+    if url.strip()
 ]
+for local_origin in ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"]:
+    if local_origin not in parsed_origins:
+        parsed_origins.append(local_origin)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.DEBUG else origins,
+    allow_origins=parsed_origins if not settings.DEBUG else ["*"],
+    allow_origin_regex=r"^https:\/\/.*\.vercel\.app$" if not settings.DEBUG else None,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+# Safe request telemetry middleware (No sensitive data or tokens logged)
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    import time
+    start_time = time.time()
+    response = await call_next(request)
+    duration = (time.time() - start_time) * 1000
+    # Safe log: method, path, status, duration
+    if request.url.path not in ["/health", "/docs", "/openapi.json"]:
+        print(f"[HTTP] {request.method} {request.url.path} -> {response.status_code} ({duration:.1f}ms)")
+    return response
 
 # Mount local uploads directory
 uploads_dir = Path(__file__).resolve().parent.parent / "static" / "uploads"

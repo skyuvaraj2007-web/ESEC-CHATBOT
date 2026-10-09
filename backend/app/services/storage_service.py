@@ -53,7 +53,13 @@ class StorageService:
         with open(file_dest, "wb") as f:
             f.write(image_bytes)
             
-        public_url = f"http://localhost:{settings.PORT}/static/uploads/{user_id}/{conversation_id}/{file_name}"
+        backend_base = (
+            os.getenv("RENDER_EXTERNAL_URL") or 
+            os.getenv("BACKEND_PUBLIC_URL") or 
+            os.getenv("BACKEND_URL") or 
+            f"http://localhost:{settings.PORT}"
+        ).rstrip("/")
+        public_url = f"{backend_base}/static/uploads/{user_id}/{conversation_id}/{file_name}"
         return image_id, storage_path, public_url
 
     @staticmethod

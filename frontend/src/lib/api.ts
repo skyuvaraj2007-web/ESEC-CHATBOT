@@ -11,7 +11,9 @@ import {
 } from '@/types';
 import { supabase } from './supabase';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+const RAW_BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+// Strip any trailing slashes to avoid double-slash URL construction
+const BACKEND_URL = RAW_BACKEND_URL.replace(/\/+$/, '');
 
 /**
  * Retrieves a valid Supabase access token, attempting a silent refresh if needed.
@@ -52,14 +54,32 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
 }
 
 /**
+ * Formats user-friendly network or HTTP error messages.
+ */
+function formatNetworkError(err: any): string {
+  if (!err) return 'An unexpected error occurred.';
+  const message = String(err.message || err);
+  if (
+    message.includes('Failed to fetch') ||
+    message.includes('NetworkError') ||
+    message.includes('Network request failed') ||
+    err.name === 'TypeError'
+  ) {
+    return 'Unable to reach the VisionAI backend. If using Render free tier, the server may be waking from sleep (takes ~30-45s). Please wait a moment and click Retry.';
+  }
+  return message;
+}
+
+/**
  * Production resilient API request handler with automatic token resolution,
  * single-retry 401 refresh lifecycle, and clean AUTH_REQUIRED propagation.
  */
 async function request<T>(path: string, options: RequestInit = {}, retryCount = 0): Promise<T> {
-  const url = `${BACKEND_URL}${path}`;
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const url = `${BACKEND_URL}${cleanPath}`;
   const isPublicAuthEndpoint =
-    path.startsWith('/api/auth/demo-otp') ||
-    path === '/health';
+    cleanPath.startsWith('/api/auth/demo-otp') ||
+    cleanPath === '/health';
 
   let token: string | null = null;
   if (!isPublicAuthEndpoint) {
@@ -78,10 +98,15 @@ async function request<T>(path: string, options: RequestInit = {}, retryCount = 
         ...(options.headers as Record<string, string> || {}),
       };
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (netErr: any) {
+    throw new Error(formatNetworkError(netErr));
+  }
 
   if (!response.ok) {
     // On 401 for protected endpoints, attempt refresh & retry once
@@ -89,7 +114,7 @@ async function request<T>(path: string, options: RequestInit = {}, retryCount = 
       try {
         const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();
         if (!refreshErr && refreshData.session?.access_token) {
-          return request<T>(path, options, retryCount + 1);
+          return request<T>(cleanPath, options, retryCount + 1);
         }
       } catch {
         // Fall through to AUTH_REQUIRED
@@ -106,7 +131,14 @@ async function request<T>(path: string, options: RequestInit = {}, retryCount = 
         errorMsg = typeof errorJson.detail === 'string' ? errorJson.detail : JSON.stringify(errorJson.detail);
       }
     } catch {
-      // ignore JSON parse error
+      // Fallback descriptions for common HTTP status codes
+      if (response.status === 413) {
+        errorMsg = 'Uploaded file is too large. Please select an image under 10MB.';
+      } else if (response.status === 429) {
+        errorMsg = 'Rate limit reached. Please slow down and retry shortly.';
+      } else if (response.status >= 500) {
+        errorMsg = 'VisionAI backend service encountered an issue. Please try again.';
+      }
     }
 
     if (response.status === 401) {
@@ -224,14 +256,19 @@ export const api = {
         throw new Error('AUTH_REQUIRED');
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(params),
-      });
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(params),
+        });
+      } catch (fetchErr: any) {
+        throw new Error(formatNetworkError(fetchErr));
+      }
 
       if (response.status === 401 && retryCount === 0) {
         const { data: refreshData, error: refreshErr } = await supabase.auth.refreshSession();

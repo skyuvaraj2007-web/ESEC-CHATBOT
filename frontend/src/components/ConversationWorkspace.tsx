@@ -31,6 +31,13 @@ export const ConversationWorkspace: React.FC<ConversationWorkspaceProps> = ({
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isMobileAnalysisOpen, setIsMobileAnalysisOpen] = useState(false);
   const [lastFailedQuery, setLastFailedQuery] = useState<string | null>(null);
+  const failedStateRef = useRef<{
+    text: string;
+    imageFile?: File | Blob;
+    imagePreview?: string;
+    inputMode: 'text' | 'voice';
+    language?: string;
+  } | null>(null);
 
   // Voice Conversation Mode & TTS State
   const [isVoiceMode, setIsVoiceMode] = useState(false);
@@ -123,16 +130,19 @@ export const ConversationWorkspace: React.FC<ConversationWorkspaceProps> = ({
   }, [stopSpeaking]);
 
   // Handle sending message / uploading image
+  // Handle sending message / uploading image
   const handleSendMessage = async (
     text: string,
     imageFile?: File | Blob,
     imagePreview?: string,
     inputMode: 'text' | 'voice' = 'text',
-    language?: string
+    language?: string,
+    isRetry = false
   ) => {
     handleStopSpeaking();
     setIsLoading(true);
     let activeConvId = currentConvId;
+    let uploadedImageModel: ImageModel | undefined;
 
     try {
       // 1. Ensure conversation exists
@@ -143,8 +153,6 @@ export const ConversationWorkspace: React.FC<ConversationWorkspaceProps> = ({
         setCurrentConvId(conv.id);
         window.history.replaceState(null, '', `/app/chat/${conv.id}`);
       }
-
-      let uploadedImageModel: ImageModel | undefined;
 
       // 2. If image is provided, upload first
       if (imageFile) {
@@ -163,28 +171,30 @@ export const ConversationWorkspace: React.FC<ConversationWorkspaceProps> = ({
       const userDisplayContent = text.trim() || (imageFile ? 'Uploaded an image for automatic visual understanding.' : '');
       const backendQuery = isAutoDescribe ? '__AUTO_DESCRIBE__' : text.trim();
 
-      // 3. Add optimistic user message to chat
-      const optimisticUserMsg: MessageModel = {
-        id: 'opt-' + Date.now(),
-        conversation_id: activeConvId,
-        user_id: 'current-user',
-        role: 'user',
-        content: userDisplayContent,
-        input_mode: inputMode,
-        language: language,
-        image_id: uploadedImageModel?.id || activeImage?.id || null,
-        image: uploadedImageModel || (imagePreview ? ({
-          id: 'temp-preview',
+      // 3. Add optimistic user message to chat (skip duplicate if this is a retry and message already visible)
+      if (!isRetry) {
+        const optimisticUserMsg: MessageModel = {
+          id: 'opt-' + Date.now(),
+          conversation_id: activeConvId,
           user_id: 'current-user',
-          storage_path: '',
-          public_url: imagePreview,
-          file_name: 'Uploaded Image',
-          mime_type: 'image/jpeg',
-        } as ImageModel) : activeImage),
-        created_at: new Date().toISOString(),
-      };
+          role: 'user',
+          content: userDisplayContent,
+          input_mode: inputMode,
+          language: language,
+          image_id: uploadedImageModel?.id || activeImage?.id || null,
+          image: uploadedImageModel || (imagePreview ? ({
+            id: 'temp-preview',
+            user_id: 'current-user',
+            storage_path: '',
+            public_url: imagePreview,
+            file_name: 'Uploaded Image',
+            mime_type: 'image/jpeg',
+          } as ImageModel) : activeImage),
+          created_at: new Date().toISOString(),
+        };
 
-      setMessages((prev) => [...prev, optimisticUserMsg]);
+        setMessages((prev) => [...prev, optimisticUserMsg]);
+      }
 
       // 4. Create streaming placeholder for Assistant message
       const streamId = 'stream-' + Date.now();
@@ -240,6 +250,7 @@ export const ConversationWorkspace: React.FC<ConversationWorkspaceProps> = ({
               }
             }
             setLastFailedQuery(null);
+            failedStateRef.current = null;
 
             // Voice Mode Auto-Playback
             if (isVoiceMode || inputMode === 'voice') {
@@ -276,6 +287,9 @@ export const ConversationWorkspace: React.FC<ConversationWorkspaceProps> = ({
                 }
               }
 
+              setLastFailedQuery(null);
+              failedStateRef.current = null;
+
               if (isVoiceMode || inputMode === 'voice') {
                 setSpeakingMessageId(chatResponse.message.id);
                 speakText(chatResponse.message.content, language, () => {
@@ -292,6 +306,14 @@ export const ConversationWorkspace: React.FC<ConversationWorkspaceProps> = ({
     } catch (err: any) {
       console.error('Chat error:', err);
       setLastFailedQuery(text);
+      failedStateRef.current = {
+        text,
+        imageFile: uploadedImageModel ? undefined : imageFile,
+        imagePreview,
+        inputMode,
+        language,
+      };
+
       const isAuthErr = err.message?.includes('session has expired') || err.message?.includes('401') || err.message === 'AUTH_REQUIRED';
       const errorContent = isAuthErr
         ? 'Your session has expired. Please sign in again.'
@@ -317,9 +339,21 @@ export const ConversationWorkspace: React.FC<ConversationWorkspaceProps> = ({
   };
 
   const handleRetry = async () => {
-    if (lastFailedQuery) {
-      setMessages((prev) => prev.filter((m) => m.user_id !== 'system'));
-      await handleSendMessage(lastFailedQuery);
+    const lastFailed = failedStateRef.current;
+    // Remove the error message from the chat list
+    setMessages((prev) => prev.filter((m) => m.user_id !== 'system'));
+
+    if (lastFailed) {
+      await handleSendMessage(
+        lastFailed.text,
+        lastFailed.imageFile,
+        lastFailed.imagePreview,
+        lastFailed.inputMode,
+        lastFailed.language,
+        true // isRetry
+      );
+    } else if (lastFailedQuery) {
+      await handleSendMessage(lastFailedQuery, undefined, undefined, 'text', undefined, true);
     }
   };
 
